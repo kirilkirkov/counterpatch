@@ -1,0 +1,29 @@
+# Copy to .github/workflows/counterpatch.yml in your repository.
+# Replace OWNER/counterpatch@v1 with the published location of the action.
+name: CounterPatch
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  counterpatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Install your project so CounterPatch can import it on both revisions.
+      - run: pip install -e .
+
+      - uses: OWNER/counterpatch@v1
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          task: ${{ github.event.pull_request.title }}

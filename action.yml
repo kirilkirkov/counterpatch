@@ -1,0 +1,117 @@
+name: "CounterPatch Adversarial Regression Testing"
+description: "Attack your patch before users do: finds small inputs that behave differently after a pull request, with reproducible pytest files."
+author: "CounterPatch contributors"
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  base:
+    description: "Base revision to compare against (branch, tag or SHA). Defaults to the pull request's base SHA. Requires actions/checkout with fetch-depth: 0."
+    required: false
+    default: ""
+  task:
+    description: "Description of the intended change, e.g. the PR title or body. Used to tell intended behavior changes from regressions."
+    required: false
+    default: ""
+  task-file:
+    description: "Path to a file containing the intended-change description."
+    required: false
+    default: ""
+  ai:
+    description: "Set to 'true' to also generate adversarial candidates with the Anthropic API. Requires the ANTHROPIC_API_KEY environment variable."
+    required: false
+    default: "false"
+  ai-model:
+    description: "Anthropic model to use with ai: 'true'. Empty means CounterPatch's default."
+    required: false
+    default: ""
+  max-tests:
+    description: "Candidate budget per changed function."
+    required: false
+    default: "100"
+  timeout:
+    description: "Overall time budget in seconds. Exceeding it fails the step with exit code 2."
+    required: false
+    default: "600"
+  call-timeout:
+    description: "Seconds a single call may run before it counts as a hang."
+    required: false
+    default: "5"
+  fail-on-divergence:
+    description: "Set to 'true' to fail on behavioral divergences as well as regression candidates."
+    required: false
+    default: "false"
+  working-directory:
+    description: "Directory inside the repository to run in."
+    required: false
+    default: "."
+  python:
+    description: "Python interpreter with your project's dependencies installed (e.g. from actions/setup-python)."
+    required: false
+    default: "python"
+  upload-reproductions:
+    description: "Set to 'false' to skip uploading .counterpatch/reproductions as a workflow artifact."
+    required: false
+    default: "true"
+
+outputs:
+  exit-code:
+    description: "0 = no regression counterexample found, 1 = regression candidate found, 2 = error."
+    value: ${{ steps.run.outputs.exit-code }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install CounterPatch
+      shell: bash
+      env:
+        CP_ACTION_PATH: ${{ github.action_path }}
+        CP_PYTHON: ${{ inputs.python }}
+        CP_AI: ${{ inputs.ai }}
+      run: |
+        extra=""
+        if [ "$CP_AI" = "true" ]; then extra="[ai]"; fi
+        "$CP_PYTHON" -m pip install --disable-pip-version-check --quiet "${CP_ACTION_PATH}${extra}"
+
+    - name: Run CounterPatch
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      # Inputs are passed through environment variables, never interpolated into the
+      # script, so a malicious PR title/body cannot inject shell commands.
+      env:
+        CP_PYTHON: ${{ inputs.python }}
+        CP_BASE: ${{ inputs.base }}
+        CP_DEFAULT_BASE: ${{ github.event.pull_request.base.sha }}
+        CP_TASK: ${{ inputs.task }}
+        CP_TASK_FILE: ${{ inputs.task-file }}
+        CP_AI: ${{ inputs.ai }}
+        CP_AI_MODEL: ${{ inputs.ai-model }}
+        CP_MAX_TESTS: ${{ inputs.max-tests }}
+        CP_TIMEOUT: ${{ inputs.timeout }}
+        CP_CALL_TIMEOUT: ${{ inputs.call-timeout }}
+        CP_FAIL_ON_DIVERGENCE: ${{ inputs.fail-on-divergence }}
+      run: |
+        args=(check --python "$CP_PYTHON" --max-tests "$CP_MAX_TESTS" --timeout "$CP_TIMEOUT" --call-timeout "$CP_CALL_TIMEOUT")
+        base="${CP_BASE:-$CP_DEFAULT_BASE}"
+        if [ -n "$base" ]; then args+=(--base "$base"); fi
+        if [ -n "$CP_TASK" ]; then args+=(--task "$CP_TASK"); fi
+        if [ -n "$CP_TASK_FILE" ]; then args+=(--task-file "$CP_TASK_FILE"); fi
+        if [ "$CP_AI" = "true" ]; then args+=(--ai); fi
+        if [ -n "$CP_AI_MODEL" ]; then args+=(--ai-model "$CP_AI_MODEL"); fi
+        if [ "$CP_FAIL_ON_DIVERGENCE" = "true" ]; then args+=(--fail-on-divergence); fi
+        set +e
+        "$CP_PYTHON" -m counterpatch "${args[@]}"
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit "$code"
+
+    - name: Upload reproductions
+      if: always() && inputs.upload-reproductions == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: counterpatch-reproductions
+        path: ${{ inputs.working-directory }}/.counterpatch/reproductions/
+        if-no-files-found: ignore

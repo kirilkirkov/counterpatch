@@ -1,0 +1,64 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest -q
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@example.com
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@example.com
+
+  action-smoke-test:
+    # Runs this repository's action against the demo project and expects it to fail
+    # with exit code 1 (regression candidate found).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build demo repository
+        run: |
+          demo="$RUNNER_TEMP/demo"
+          mkdir -p "$demo"
+          cp -R examples/demo_project/src examples/demo_project/tests examples/demo_project/pyproject.toml "$demo/"
+          cd "$demo"
+          git init -q -b main
+          git -c user.name=ci -c user.email=ci@example.com add .
+          git -c user.name=ci -c user.email=ci@example.com commit -q -m base
+          cp "$GITHUB_WORKSPACE/examples/demo_project/patches/banking.py" src/banking.py
+          git -c user.name=ci -c user.email=ci@example.com commit -q -am "Refactor withdrawal validation"
+      - id: counterpatch
+        uses: ./
+        continue-on-error: true
+        with:
+          base: HEAD~1
+          task: Refactor withdrawal validation.
+          working-directory: ${{ runner.temp }}/demo
+          upload-reproductions: "false"
+      - name: Expect a regression candidate
+        env:
+          EXIT_CODE: ${{ steps.counterpatch.outputs.exit-code }}
+        run: test "$EXIT_CODE" = "1"
