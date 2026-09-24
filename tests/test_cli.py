@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -21,8 +22,10 @@ def test_version_and_help() -> None:
     assert invoke("--help").exit_code == 0
     result = invoke("check", "--help")
     assert result.exit_code == 0
+    # Typer forces Rich colors when GITHUB_ACTIONS/FORCE_COLOR is set, even under CliRunner.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     for option in ["--base", "--task", "--task-file", "--ai", "--max-tests", "--timeout", "--verbose"]:
-        assert option in result.output
+        assert option in plain
 
 
 def test_exit_code_0_when_patch_preserves_behavior(patched_repo) -> None:
