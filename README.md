@@ -9,7 +9,7 @@ It does not ask an LLM whether your patch looks correct. Generators propose inpu
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
-> Status: v0.1.0, alpha. Python projects on Linux and macOS. Not yet published to PyPI or the GitHub Marketplace.
+> Status: v0.1.3, alpha. Python projects on Linux and macOS.
 
 ## Find the bug your tests missed
 
@@ -49,7 +49,7 @@ Requires Python 3.11+, Git, and Linux or macOS.
 CounterPatch is not on PyPI yet. Install it from source into the **same environment as the project you want to test**, since it imports your code:
 
 ```bash
-git clone https://github.com/OWNER/counterpatch
+git clone https://github.com/kirilkirkov/counterpatch
 pip install -e ./counterpatch            # deterministic mode
 pip install -e "./counterpatch[ai]"      # optional: adds the Anthropic SDK for --ai
 ```
@@ -105,13 +105,13 @@ jobs:
 
       - run: pip install -e . # your project and its dependencies
 
-      - uses: OWNER/counterpatch@v1
+      - uses: kirilkirkov/counterpatch@v0.1.3
         with:
           base: ${{ github.event.pull_request.base.sha }}
           task: ${{ github.event.pull_request.title }}
 ```
 
-`OWNER/counterpatch@v1` is a placeholder until the action is published.
+`kirilkirkov/counterpatch@v0.1.3` is a placeholder until the action is published.
 
 - **Findings** appear as PR annotations and in the job summary.
 - **Reproductions** are uploaded as the `counterpatch-reproductions` artifact.
@@ -345,7 +345,7 @@ The suite includes integration tests that build real Git repositories with a bug
 - Running existing tests that cover changed functions against both revisions
 - Optional container sandboxing for untrusted repositories
 - SARIF output for GitHub code scanning
-- PyPI and GitHub Marketplace releases
+- PyPI release
 
 ## Contributing
 
