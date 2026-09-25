@@ -1,6 +1,6 @@
-name: "CounterPatch Adversarial Regression Testing"
-description: "Attack your patch before users do: finds small inputs that behave differently after a pull request, with reproducible pytest files."
-author: "CounterPatch contributors"
+name: "CounterPatch"
+description: "Attack your patch before users do: find behavioral regressions and generate reproducible pytest counterexamples."
+author: "kirilkirkov"
 branding:
   icon: "shield"
   color: "red"
